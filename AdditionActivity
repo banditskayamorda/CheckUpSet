@@ -1,0 +1,198 @@
+package com.example.admin.checkupset;
+
+import android.app.Activity;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.support.annotation.RequiresApi;
+import android.support.design.widget.Snackbar;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.File;
+import java.util.Objects;
+
+public class AdditionActivity extends Activity implements OnClickListener {
+
+    final String LOG_TAG = "myLogs";
+
+    Button btnAddDet, btnAddSet;
+    EditText etSet, etDet,etNum;
+
+    DBHelper dbHelper;
+    TextView scrollText;
+    String str = "";
+    String SetNameString="",DetNameString=null;
+    int Num = 0;
+    Kit kat;
+
+    /** Called when the activity is first created. */
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.add2);
+
+        btnAddSet = (Button) findViewById(R.id.btnAddSet);
+        btnAddSet.setOnClickListener(this);
+
+        btnAddDet = (Button) findViewById(R.id.btnAddDet);
+        btnAddDet.setOnClickListener(this);
+
+        etSet = (EditText) findViewById(R.id.EditSetName);
+        etDet = (EditText) findViewById(R.id.EditDetailName);
+        etNum = (EditText) findViewById(R.id.EditNumber);
+        scrollText = (TextView) findViewById(R.id.scrollTextAddition);
+
+        // создаем объект для создания и управления версиями БД
+        dbHelper = new DBHelper(this);
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    @Override
+    public void onClick(View v) {
+
+        SetNameString = etSet.getText().toString();
+        ContentValues cv = new ContentValues();
+        // подключаемся к БД
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+
+        switch (v.getId()) {
+            case R.id.btnAddDet:
+                try{
+                    DetNameString = etDet.getText().toString();
+                    Num = Integer.parseInt(etNum.getText().toString());
+                Log.d(LOG_TAG, "--- Insert in kit: ---");
+                // подготовим данные для вставки в виде пар: наименование столбца - значение
+                cv.put("detail", DetNameString);
+                cv.put("amount", Num);
+                // вставляем запись и получаем ее ID
+                long rowID = db.insert("kit", null, cv);
+                Log.d(LOG_TAG, "row inserted, ID = " + rowID);
+                str = str+ rowID +") "+ DetNameString +" "+Num+"\n";
+                scrollText.setText(str);
+                Snackbar.make(v, "Деталь " + DetNameString + " добавлена", Snackbar.LENGTH_SHORT)
+                        .setAction("Action", null).show();}
+                catch (Exception e){
+                    Toast.makeText(this,"Введено не корректно: убедитесь, что заполнены поля 'Название детали' " +
+                        "и 'Кол-во деталей'",Toast.LENGTH_SHORT).show();}
+                break;
+            case R.id.btnAddSet:
+                if(Objects.equals(SetNameString, "")){
+                    Toast.makeText(this,"Введите название набора",Toast.LENGTH_SHORT).show();
+                }else{
+                    kat = new Kit();
+                    //присвоение в kat name, layoutString и db
+                    kat.name = SetNameString;
+                    kat.layoutString = str;
+                    kat.database = db;
+                    Toast.makeText(this,"Набор "+SetNameString+" добавлен",Toast.LENGTH_SHORT).show();
+
+                    /*Log.d(LOG_TAG, "--- Rows in kit: ---");
+                    // делаем запрос всех данных из таблицы mytable, получаем Cursor
+                    Cursor c = db.query("kit", null, null, null, null, null, null);
+
+                    // ставим позицию курсора на первую строку выборки
+                    // если в выборке нет строк, вернется false
+                    if (c.moveToFirst()) {
+
+                        // определяем номера столбцов по имени в выборке
+                        int idColIndex = c.getColumnIndex("id");
+                        int nameColIndex = c.getColumnIndex("detail");
+                        int emailColIndex = c.getColumnIndex("amount");
+
+                        do {
+                            // получаем значения по номерам столбцов и пишем все в лог
+                            Log.d(LOG_TAG,
+                                    "ID = " + c.getInt(idColIndex) +
+                                            ", detail = " + c.getString(nameColIndex) +
+                                            ", amount = " + c.getString(emailColIndex));
+                            // переход на следующую строку
+                            // а если следующей нет (текущая - последняя), то false - выходим из цикла
+                        } while (c.moveToNext());
+                    } else
+                        Log.d(LOG_TAG, "0 rows");
+                    c.close();*/
+
+                    SQLiteDatabase.deleteDatabase(new File(db.getPath()));
+                    str ="";
+                    Intent i = new Intent(AdditionActivity.this,MainActivity.class);
+                    i.putExtra("key",kat);
+                    startActivity(i);
+
+                }
+                break;
+        }
+        // закрываем подключение к БД
+        dbHelper.close();
+    }
+
+
+    class DBHelper extends SQLiteOpenHelper {
+        public DBHelper(Context context) {
+            super(context, "myDB", null, 1);
+        }
+
+        @Override
+        public void onCreate(SQLiteDatabase db) {
+            Log.d(LOG_TAG, "--- onCreate database ---");
+            // создаем таблицу с полями
+            db.execSQL("create table kit ("
+                    + "id integer primary key autoincrement,"
+                    + "detail text,"
+                    + "amount text" + ");");
+        }
+
+        @Override
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+
+        }
+    }
+
+}
+class Kit implements Parcelable{
+    String name;
+    String layoutString;
+    SQLiteDatabase database;
+
+    protected Kit(Parcel in) {
+        name = in.readString();
+        layoutString = in.readString();
+    }
+
+    public static final Creator<Kit> CREATOR = new Creator<Kit>() {
+        @Override
+        public Kit createFromParcel(Parcel in) {
+            return new Kit(in);
+        }
+
+        @Override
+        public Kit[] newArray(int size) {
+            return new Kit[size];
+        }
+    };
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(name);
+        dest.writeString(layoutString);
+    }
+}
